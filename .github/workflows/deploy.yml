@@ -46,47 +46,58 @@ jobs:
           SECRET: ${{ secrets.YC_SECRET_ACCESS_KEY }}
 
       - name: Install boto3
-        run: pip install boto3
+        run: pip install --upgrade boto3 botocore
 
       - name: Deploy to Yandex Object Storage
         env:
           YC_ACCESS_KEY_ID: ${{ secrets.YC_ACCESS_KEY_ID }}
           YC_SECRET_ACCESS_KEY: ${{ secrets.YC_SECRET_ACCESS_KEY }}
         run: |
-          python3 - <<'EOF'
+          cat > /tmp/deploy.py << 'PYEOF'
+          import sys, subprocess
+          subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-q', '--upgrade', 'boto3'])
+
           import boto3, os, mimetypes
           from pathlib import Path
           from botocore.config import Config
 
           s3 = boto3.client(
-            's3',
-            endpoint_url='https://storage.yandexcloud.net',
-            aws_access_key_id=os.environ['YC_ACCESS_KEY_ID'],
-            aws_secret_access_key=os.environ['YC_SECRET_ACCESS_KEY'],
-            region_name='ru-central1',
-            config=Config(signature_version='s3v4', s3={'addressing_style': 'path'})
+              's3',
+              endpoint_url='https://storage.yandexcloud.net',
+              aws_access_key_id=os.environ['YC_ACCESS_KEY_ID'],
+              aws_secret_access_key=os.environ['YC_SECRET_ACCESS_KEY'],
+              region_name='ru-central1',
+              config=Config(
+                  signature_version='s3v4',
+                  s3={'addressing_style': 'path'},
+              )
           )
 
           BUCKET = 'koloskov-rf'
           DIST   = Path('dist')
 
-          # Upload all files
-          for file in DIST.rglob('*'):
-            if not file.is_file():
-              continue
-            key = str(file.relative_to(DIST))
-            mime, _ = mimetypes.guess_type(str(file))
-            extra = {'ContentType': mime or 'application/octet-stream'}
-            s3.upload_file(str(file), BUCKET, key, ExtraArgs=extra)
-            print(f'  uploaded: {key}')
+          for file in sorted(DIST.rglob('*')):
+              if not file.is_file():
+                  continue
+              key = str(file.relative_to(DIST))
+              mime, _ = mimetypes.guess_type(str(file))
+              with open(file, 'rb') as f:
+                  body = f.read()
+              s3.put_object(
+                  Bucket=BUCKET,
+                  Key=key,
+                  Body=body,
+                  ContentType=mime or 'application/octet-stream',
+              )
+              print(f'  uploaded: {key}')
 
-          # Delete removed files
           existing = {o['Key'] for page in s3.get_paginator('list_objects_v2').paginate(Bucket=BUCKET) for o in page.get('Contents', [])}
           local    = {str(f.relative_to(DIST)) for f in DIST.rglob('*') if f.is_file()}
           to_del   = existing - local
           if to_del:
-            s3.delete_objects(Bucket=BUCKET, Delete={'Objects': [{'Key': k} for k in to_del]})
-            print(f'  deleted: {len(to_del)} files')
+              s3.delete_objects(Bucket=BUCKET, Delete={'Objects': [{'Key': k} for k in to_del]})
+              print(f'  deleted: {len(to_del)} files')
 
           print('Done!')
-          EOF
+          PYEOF
+          python3 /tmp/deploy.py
