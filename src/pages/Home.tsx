@@ -1,23 +1,21 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { FileText, Folder, ArrowRight } from 'lucide-react'
+import { FileText, Folder, ChevronRight } from 'lucide-react'
 import { Layout } from '@/components/Layout'
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { loadManifest } from '@/lib/content'
 import type { Manifest } from '@/lib/types'
 
-// Section icons & colors for visual variety
-const SECTION_STYLES: Record<number, { color: string; bg: string }> = {
-  0: { color: 'text-violet-600', bg: 'bg-violet-50 dark:bg-violet-950/30' },
-  1: { color: 'text-blue-600',   bg: 'bg-blue-50 dark:bg-blue-950/30' },
-  2: { color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-950/30' },
-  3: { color: 'text-amber-600',  bg: 'bg-amber-50 dark:bg-amber-950/30' },
-  4: { color: 'text-rose-600',   bg: 'bg-rose-50 dark:bg-rose-950/30' },
-  5: { color: 'text-teal-600',   bg: 'bg-teal-50 dark:bg-teal-950/30' },
-  6: { color: 'text-indigo-600', bg: 'bg-indigo-50 dark:bg-indigo-950/30' },
-  7: { color: 'text-orange-600', bg: 'bg-orange-50 dark:bg-orange-950/30' },
-  8: { color: 'text-cyan-600',   bg: 'bg-cyan-50 dark:bg-cyan-950/30' },
+const SECTION_COLORS: Record<number, string> = {
+  0: 'text-violet-400',
+  1: 'text-blue-400',
+  2: 'text-emerald-400',
+  3: 'text-amber-400',
+  4: 'text-rose-400',
+  5: 'text-teal-400',
+  6: 'text-indigo-400',
+  7: 'text-orange-400',
+  8: 'text-cyan-400',
 }
 
 export function Home() {
@@ -60,7 +58,7 @@ export function Home() {
       {/* Hero */}
       <div className="mb-10">
         <h1 className="text-4xl font-bold tracking-tight text-foreground mb-3">
-          База знаний
+          КОЛОСКОВ.РФ
         </h1>
         <p className="text-muted-foreground text-lg max-w-2xl">
           Персональная коллекция заметок, аналитики и концепций в области финтех и продуктовой разработки.
@@ -77,38 +75,25 @@ export function Home() {
         </div>
       </div>
 
-      {/* Sections grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* Sections list */}
+      <div className="flex flex-col gap-2">
         {manifest.sections.map((section, idx) => {
-          const style = SECTION_STYLES[idx] ?? SECTION_STYLES[0]
-          const hasSubfolders = section.subfolders.length > 0
+          const color = SECTION_COLORS[idx] ?? SECTION_COLORS[0]
 
           return (
-            <Link key={section.slug} to={`/${section.slug}`} className="group">
-              <Card className="h-full transition-all duration-200 hover:shadow-md hover:border-border/80 cursor-pointer">
-                <CardHeader className="pb-3">
-                  <div className={`w-10 h-10 rounded-lg ${style.bg} flex items-center justify-center mb-3`}>
-                    <Folder className={`h-5 w-5 ${style.color}`} />
-                  </div>
-                  <CardTitle className="text-base leading-snug group-hover:text-primary transition-colors">
-                    {section.name}
-                  </CardTitle>
-                  {hasSubfolders && (
-                    <CardDescription className="text-xs">
-                      {section.subfolders.length} подразделов
-                    </CardDescription>
-                  )}
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">
-                      {section.fileCount} {section.fileCount === 1 ? 'заметка' :
-                        section.fileCount < 5 ? 'заметки' : 'заметок'}
-                    </span>
-                    <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
-                  </div>
-                </CardContent>
-              </Card>
+            <Link
+              key={section.slug}
+              to={`/${section.slug}`}
+              className="flex items-center gap-4 px-4 py-3.5 rounded-xl border border-border bg-card hover:bg-accent/60 transition-colors group"
+            >
+              <Folder className={`h-5 w-5 shrink-0 ${color}`} />
+              <span className="flex-1 text-sm font-medium text-foreground leading-snug">
+                {section.name}
+              </span>
+              <span className="text-sm text-muted-foreground tabular-nums shrink-0">
+                {section.fileCount}
+              </span>
+              <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 opacity-40 group-hover:opacity-100 transition-opacity" />
             </Link>
           )
         })}
