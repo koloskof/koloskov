@@ -35,21 +35,48 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Install AWS CLI
-        run: pip install awscli
+      - name: Install boto3
+        run: pip install boto3
 
-      - name: Configure AWS CLI for Yandex Object Storage
-        run: |
-          aws configure set default.s3.signature_version s3v4
-          aws configure set default.s3.addressing_style path
-
-      - name: Deploy to S3 (Yandex Object Storage)
-        run: |
-          aws s3 sync dist/ s3://koloskov-rf \
-            --endpoint-url https://storage.yandexcloud.net \
-            --delete \
-            --no-progress
+      - name: Deploy to Yandex Object Storage
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.YC_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.YC_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: ru-central1
+          YC_ACCESS_KEY_ID: ${{ secrets.YC_ACCESS_KEY_ID }}
+          YC_SECRET_ACCESS_KEY: ${{ secrets.YC_SECRET_ACCESS_KEY }}
+        run: |
+          python3 - <<'EOF'
+          import boto3, os, mimetypes
+          from pathlib import Path
+          from botocore.config import Config
+
+          s3 = boto3.client(
+            's3',
+            endpoint_url='https://storage.yandexcloud.net',
+            aws_access_key_id=os.environ['YC_ACCESS_KEY_ID'],
+            aws_secret_access_key=os.environ['YC_SECRET_ACCESS_KEY'],
+            region_name='ru-central1',
+            config=Config(signature_version='s3v4', s3={'addressing_style': 'path'})
+          )
+
+          BUCKET = 'koloskov-rf'
+          DIST   = Path('dist')
+
+          # Upload all files
+          for file in DIST.rglob('*'):
+            if not file.is_file():
+              continue
+            key = str(file.relative_to(DIST))
+            mime, _ = mimetypes.guess_type(str(file))
+            extra = {'ContentType': mime or 'application/octet-stream'}
+            s3.upload_file(str(file), BUCKET, key, ExtraArgs=extra)
+            print(f'  uploaded: {key}')
+
+          # Delete removed files
+          existing = {o['Key'] for page in s3.get_paginator('list_objects_v2').paginate(Bucket=BUCKET) for o in page.get('Contents', [])}
+          local    = {str(f.relative_to(DIST)) for f in DIST.rglob('*') if f.is_file()}
+          to_del   = existing - local
+          if to_del:
+            s3.delete_objects(Bucket=BUCKET, Delete={'Objects': [{'Key': k} for k in to_del]})
+            print(f'  deleted: {len(to_del)} files')
+
+          print('Done!')
+          EOF
