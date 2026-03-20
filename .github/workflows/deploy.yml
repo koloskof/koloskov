@@ -35,6 +35,16 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Verify secrets are set
+        run: |
+          if [ -z "$KEY_ID" ]; then echo "❌ YC_ACCESS_KEY_ID is empty!"; exit 1; fi
+          if [ -z "$SECRET" ]; then echo "❌ YC_SECRET_ACCESS_KEY is empty!"; exit 1; fi
+          echo "✅ YC_ACCESS_KEY_ID length: ${#KEY_ID}"
+          echo "✅ YC_SECRET_ACCESS_KEY length: ${#SECRET}"
+        env:
+          KEY_ID: ${{ secrets.YC_ACCESS_KEY_ID }}
+          SECRET: ${{ secrets.YC_SECRET_ACCESS_KEY }}
+
       - name: Install boto3
         run: pip install boto3
 
